@@ -2247,7 +2247,8 @@ def doConfigure(myenv):
             "BOOST_SYSTEM_NO_DEPRECATED",
 			#tdnguyen
 			#"MSSD_FILEBASED",
-			"MSSD_BOUNDBASED",
+			#"MSSD_BOUNDBASED",
+			"MSSD_DSM",
         ]
     )
 
