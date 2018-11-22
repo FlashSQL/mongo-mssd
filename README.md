@@ -33,4 +33,4 @@ To use a desired macro, edit the [SConstruct](SConstruct) file
 
 `MSSD_BOUNDBASED`: boundary-based stream mapping
 
-`MSSD_DSM`: Dyanmic Stream Mapping (DSM)
+`MSSD_DSM`: Dynamic Stream Mapping (DSM)
