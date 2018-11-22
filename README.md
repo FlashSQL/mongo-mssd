@@ -25,7 +25,12 @@ $ scons core -j40
 See [docs/building.md](docs/building.md) for more detail.
 
 ## Using Macros
+This project support various stream mapping approaches. Each approach has corresponding macro.
+
+To use a desired macro, edit the [SConstruct](SConstruct) file
 
 `MSSD_FILEBASED`: file-based stream mapping
+
 `MSSD_BOUNDBASED`: boundary-based stream mapping
+
 `MSSD_DSM`: Dyanmic Stream Mapping (DSM)
