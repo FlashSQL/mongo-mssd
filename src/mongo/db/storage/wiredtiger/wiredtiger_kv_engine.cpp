@@ -63,6 +63,12 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
+#if defined (MSSD_FILEBASED)
+#include <third_party/wiredtiger/src/include/mssd.h>
+extern MSSD_MAP* mssd_map;
+extern FILE* my_fp10;
+#endif //MSSD_FILEBASED
+
 #if !defined(__has_feature)
 #define __has_feature(x) 0
 #endif
@@ -159,6 +165,18 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     ss << "statistics_log=(wait=" << wiredTigerGlobalOptions.statisticsLogDelaySecs << "),";
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())->getOpenConfig("system");
     ss << extraOpenOptions;
+
+#if defined (MSSD_FILEBASED)
+	//do initilizations
+	my_fp10 = fopen("my_mssd_track10.txt", "a");
+	
+	mssd_map = mssdmap_new();
+#if defined(S840_PRO)
+	printf("SSDM OP10 on Samsung 840Pro, one stream for one file\n");
+#else
+	printf("SSDM OP10, one stream for one file. For linkbench, require %d  opened streams\n", MSSD_OPLOG_SID + 9);
+#endif //MSSD_FILEBASED
+
     if (!_durable) {
         // If we started without the journal, but previously used the journal then open with the
         // WT log enabled to perform any unclean shutdown recovery and then close and reopen in
