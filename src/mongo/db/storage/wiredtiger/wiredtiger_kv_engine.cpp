@@ -69,6 +69,26 @@ extern MSSD_MAP* mssd_map;
 extern FILE* my_fp10;
 #endif //MSSD_FILEBASED
 
+#if defined (MSSD_BOUNDBASED)
+#include <stdint.h> //for PRIu64
+//#include "third_party/mssd/mssd.h"
+#include <third_party/wiredtiger/src/include/mssd.h>
+extern MSSD_MAP* mssd_map;
+extern off_t* retval;
+extern FILE* my_fp6;
+extern int my_coll_streamid1;
+extern int my_coll_streamid2;
+extern int my_index_streamid1;
+extern int my_index_streamid2;
+extern uint64_t count1;
+extern uint64_t count2;
+extern void mssdmap_free(MSSD_MAP* m);
+extern MSSD_MAP* mssdmap_new();
+#if defined(SSDM_OP6_DEBUG)
+extern struct timeval start;
+#endif
+#endif //MSSD_BOUNDBASED
+
 #if !defined(__has_feature)
 #define __has_feature(x) 0
 #endif
@@ -178,6 +198,29 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
 #endif
 #endif //MSSD_FILEBASED
 
+#if defined (MSSD_BOUNDBASED)
+	//do initilizations
+	my_fp6 = fopen("my_mssd_track6.txt", "a");
+	
+	mssd_map = mssdmap_new();
+	retval = (off_t*) malloc(sizeof(off_t));
+
+	my_coll_streamid1 = MSSD_COLL_INIT_SID;
+	my_coll_streamid2 = MSSD_COLL_INIT_SID + 1;
+
+	my_index_streamid1 = MSSD_IDX_INIT_SID;
+	my_index_streamid2 = MSSD_IDX_INIT_SID + 1;
+
+	fprintf(stderr, "==> SSDM_OP6, multi-streamed SSD boundary-based, require %d stream opened \n \
+			coll_streams %d %d index_streams %d %d \n", 
+			my_index_streamid2, my_coll_streamid1, my_coll_streamid2, my_index_streamid1, my_index_streamid2);
+
+	count1 = count2 = 0;
+#if defined (SSDM_OP6_DEBUG)
+	gettimeofday(&start, NULL);
+#endif 
+#endif //MSSD_BOUNDBASED
+
     if (!_durable) {
         // If we started without the journal, but previously used the journal then open with the
         // WT log enabled to perform any unclean shutdown recovery and then close and reopen in
@@ -242,6 +285,19 @@ void WiredTigerKVEngine::cleanShutdown() {
     log() << "WiredTigerKVEngine shutting down";
     syncSizeInfo(true);
     if (_conn) {
+#if defined (MSSD_BOUNDBASED)
+	int ret;
+
+	ret = fflush(my_fp6);
+	if (ret){
+		perror("fflush");
+	}
+	//free what we've allocated
+	printf("free mssd struct\n");
+	free(retval);
+	mssdmap_free(mssd_map);	
+#endif //MSSD_BOUNDBASED
+
         // these must be the last things we do before _conn->close();
         _sizeStorer.reset(NULL);
         if (_journalFlusher)
