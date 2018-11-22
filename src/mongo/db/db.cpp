@@ -30,7 +30,7 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#if defined (MSSD_FILEBASED)
+#if defined (MSSD_FILEBASED) || defined (MSSD_BOUNDBASED) || defined (MSSD_DSM)
 #include <third_party/wiredtiger/src/include/mssd.h>
 #endif //MSSD_FILEBASED
 
@@ -702,10 +702,28 @@ int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
     quickExit(exitCode);
 }
 #else
+
 #if defined (MSSD_FILEBASED)
 FILE* my_fp10;
 MSSD_MAP* mssd_map; //mssd map table, need mssd.h
 #endif //MSSD_FILEBASED
+
+#if defined (MSSD_BOUNDBASED)
+MSSD_MAP* mssd_map; //mssd map table, need mssd.h
+FILE* my_fp6;
+int my_coll_streamid1;
+int my_coll_streamid2;
+
+int my_index_streamid1;
+int my_index_streamid2;
+off_t *retval; //shared return val for offset
+uint64_t count1;
+uint64_t count2;
+#if defined(SSDM_OP6_DEBUG)
+struct timeval start;
+#endif
+#endif
+
 
 int main(int argc, char* argv[], char** envp) {
     int exitCode = mongoDbMain(argc, argv, envp);

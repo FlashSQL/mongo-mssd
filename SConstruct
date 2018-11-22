@@ -2246,7 +2246,8 @@ def doConfigure(myenv):
             "BOOST_THREAD_DONT_PROVIDE_VARIADIC_THREAD",
             "BOOST_SYSTEM_NO_DEPRECATED",
 			#tdnguyen
-			"MSSD_FILEBASED",
+			#"MSSD_FILEBASED",
+			"MSSD_BOUNDBASED",
         ]
     )
 
