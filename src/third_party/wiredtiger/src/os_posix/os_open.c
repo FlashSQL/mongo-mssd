@@ -8,6 +8,18 @@
 
 #include "wt_internal.h"
 
+#if defined (MSSD_FILEBASED)
+#include <fcntl.h>
+#include <string.h>
+#include <errno.h>
+#include <sys/ioctl.h> //for ioctl
+#include <linux/fs.h> //for FIBMAP
+
+#include "mssd.h"
+extern FILE* my_fp10;
+extern MSSD_MAP* mssd_map;
+#endif
+
 /*
  * __open_directory --
  *	Open up a file handle to a directory.
@@ -24,6 +36,40 @@ __open_directory(WT_SESSION_IMPL *session, char *path, int *fd)
 	return (ret);
 }
 
+#if defined (MSSD_FILEBASED)
+off_t get_last_logical_file_offset(int fd){
+	
+	struct stat buf;                                                                                                                                                                                              
+	int ret;
+
+	ret = fstat(fd, &buf);
+	if(ret < 0) {
+		perror("fstat");
+		return -1; 
+	}   
+	return buf.st_size;
+}
+off_t get_physical_file_offset (int fd) {
+	struct stat buf;                                                                                                                                                                                              
+	int ret;
+	off_t offset;
+
+	ret = fstat(fd, &buf);
+	if(ret < 0) {
+		perror("fstat");
+		return -1; 
+	}   
+	offset = (buf.st_size - 4096) / 4096;
+	//map logical offset to physical offset 
+	ret = ioctl(fd, FIBMAP, &offset);
+	if(ret != 0){ 
+		perror("ioctl");
+		return -1; 
+	}   
+	return offset;
+}
+
+#endif //MSSD_FILEBASED
 /*
  * __wt_open --
  *	Open a file handle.
@@ -40,6 +86,11 @@ __wt_open(WT_SESSION_IMPL *session,
 	int f, fd;
 	bool direct_io, matched;
 	char *path;
+
+#if defined (MSSD_FILEBASED)
+	int my_ret;
+	int stream_id;
+#endif //MSSD_FILEBASED
 
 	conn = S2C(session);
 	direct_io = false;
@@ -143,6 +194,57 @@ setupfh:
 	    dio_type == WT_FILE_TYPE_CHECKPOINT)
 		WT_ERR(posix_fadvise(fd, 0, 0, POSIX_FADV_RANDOM));
 #endif
+
+#if defined (MSSD_FILEBASED)
+	//file-based stream mapping, require # of stream id equal to # of files
+	//Internal fracmentation may occur
+	//REQUIRES: MSSD_OPLOG_SID + 9  streams (12)
+	stream_id = 1;
+	if ( strstr(name, "local") != 0) {
+		if( (strstr(name, "local/collection/2") != 0) ) { 
+			//OPLOG need to be seperated 
+			stream_id = MSSD_OPLOG_SID;
+		}
+		else //other metadata files 
+			stream_id = MSSD_OTHER_SID;
+	}
+	else if( strstr(name, "journal") != 0){
+		stream_id = MSSD_JOURNAL_SID;
+	}
+	//if( ((strstr(name, "linkbench/collection") != 0) || (strstr(name, "linkbench/index") != 0)) ) { 
+	else if( ((strstr(name, "collection") != 0) || (strstr(name, "index") != 0)) ) { 
+		int id;
+		off_t offs;
+
+		offs = get_last_logical_file_offset(fd);
+		id = mssdmap_find(mssd_map, name);
+		if( id >= 0) {
+			//file is already exist, do nothing
+		}
+		else {
+#if defined(S840_PRO)
+		//all colls: MSSD_COLL_INIT_SID, all indexes: MSSD_IDX_INIT_SID
+		if (strstr(name, "collection") != 0)
+			stream_id = MSSD_COLL_INIT_SID;
+		else
+			stream_id = MSSD_IDX_INIT_SID; //index
+#else //Samsung PM953, use mssd_map
+			//add new file and sid to the map
+			stream_id = MSSD_OPLOG_SID + mssd_map->size + 1;
+			mssdmap_append(mssd_map, name, offs, stream_id);
+#endif //S840_PRO
+		}
+	}
+	else { //others
+		stream_id = MSSD_OTHER_SID;
+	}
+//Call posix_fadvise to advise stream_id
+	my_ret = posix_fadvise(fd, 0, stream_id, 8);	
+	if (my_ret != 0){
+		fprintf(my_fp10,"register file %s with stream-id %d\n", name, stream_id);
+	}
+
+#endif //MSSD_FILEBASED
 
 	WT_ERR(__wt_calloc_one(session, &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));

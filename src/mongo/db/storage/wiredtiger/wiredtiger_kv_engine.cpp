@@ -175,6 +175,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
 	printf("SSDM OP10 on Samsung 840Pro, one stream for one file\n");
 #else
 	printf("SSDM OP10, one stream for one file. For linkbench, require %d  opened streams\n", MSSD_OPLOG_SID + 9);
+#endif
 #endif //MSSD_FILEBASED
 
     if (!_durable) {
