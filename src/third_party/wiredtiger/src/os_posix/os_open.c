@@ -8,7 +8,7 @@
 
 #include "wt_internal.h"
 
-#if defined (MSSD_FILEBASED)
+#if defined (MSSD_FILEBASED) || defined (MSSD_BOUNDBASED) || defined (MSSD_DSM)
 #include <fcntl.h>
 #include <string.h>
 #include <errno.h>
@@ -16,9 +16,18 @@
 #include <linux/fs.h> //for FIBMAP
 
 #include "mssd.h"
-extern FILE* my_fp10;
 extern MSSD_MAP* mssd_map;
+
+#if defined (MSSD_FILEBASED)
+extern FILE* my_fp10;
 #endif
+
+#if defined (MSSD_BOUNDBASED)
+extern off_t* retval;
+extern FILE* my_fp6; 
+#endif
+
+#endif //MSSD_FILEBASED || MSSD_BOUNDBASED || MSSD_DSM
 
 /*
  * __open_directory --
@@ -36,7 +45,7 @@ __open_directory(WT_SESSION_IMPL *session, char *path, int *fd)
 	return (ret);
 }
 
-#if defined (MSSD_FILEBASED)
+#if defined (MSSD_FILEBASED) || defined (MSSD_BOUNDBASED) || defined (MSSD_DSM)
 off_t get_last_logical_file_offset(int fd){
 	
 	struct stat buf;                                                                                                                                                                                              
@@ -87,7 +96,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	bool direct_io, matched;
 	char *path;
 
-#if defined (MSSD_FILEBASED)
+#if defined (MSSD_FILEBASED) || defined (MSSD_BOUNDBASED) || defined (MSSD_DSM)
 	int my_ret;
 	int stream_id;
 #endif //MSSD_FILEBASED
@@ -243,8 +252,59 @@ setupfh:
 	if (my_ret != 0){
 		fprintf(my_fp10,"register file %s with stream-id %d\n", name, stream_id);
 	}
-
 #endif //MSSD_FILEBASED
+
+#if defined (MSSD_BOUNDBASED)
+	off_t offs;
+	// others: 1, journal: 2, collection: 3~4, index: 5~6
+	//Exclude collection files and index file in local directory 
+	//Comment on 2016.11.23, check local may expensive 
+
+	if ( strstr(name, "local") != 0 ) {
+		//only seperate OPLOG collection, the name is always has "2" as prefix
+		if( (strstr(name, "local/collection/2") != 0) ) { 
+			stream_id = MSSD_OPLOG_SID;
+		}
+		else //other metadata files 
+			stream_id = MSSD_OTHER_SID;
+	}
+	else if( strstr(name, "journal") != 0){
+		stream_id = MSSD_JOURNAL_SID;
+	}
+	//work for both ycsb and linkbench
+	else if( ((strstr(name, "collection") != 0) || (strstr(name, "index") != 0)) ) { 
+	//if( ((strstr(name, "linkbench/collection") != 0) || (strstr(name, "linkbench/index") != 0)) ) { 
+		if (strstr(name, "collection") != 0)
+			stream_id = MSSD_COLL_INIT_SID;
+		else
+			stream_id = MSSD_IDX_INIT_SID; //index
+		//use logical offset instead of physical offset
+		//offs = get_physical_file_offset(fd);
+		offs = get_last_logical_file_offset(fd);
+
+		//Register new (filename, offset) pair. If the pair is existed, no changes
+		//achieve offset in retval 
+		//my_ret = mssdmap_get_or_append(mssd_map, name, offs, stream_id, retval);
+		my_ret = mssdmap_get_or_append(mssd_map, name, offs, retval);
+		if (*retval)
+			printf("my_ret =  %d retval= %jd, size= %d\n",my_ret, *retval, mssd_map->size);
+		else
+			printf("append [%s %jd], size=%d\n", name, offs, mssd_map->size);
+	}
+	else {
+			//others
+			stream_id = MSSD_OTHER_SID;
+	}
+//Call posix_fadvise to advise stream_id
+	my_ret = posix_fadvise(fd, 0, stream_id, 8);	
+//	printf("register file %s with stream-id %d\n", name, stream_id);
+	fprintf(my_fp6,"register file %s with stream-id %d\n", name, stream_id);
+
+	if(my_ret != 0){
+		perror("posix_fadvise");	
+	}
+
+#endif //MSSD_BOUNDBASED
 
 	WT_ERR(__wt_calloc_one(session, &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));
