@@ -23,3 +23,9 @@ $ scons core -j40
 ```
 
 See [docs/building.md](docs/building.md) for more detail.
+
+## Using Macros
+
+`MSSD_FILEBASED`: file-based stream mapping
+`MSSD_BOUNDBASED`: boundary-based stream mapping
+`MSSD_DSM`: Dyanmic Stream Mapping (DSM)
