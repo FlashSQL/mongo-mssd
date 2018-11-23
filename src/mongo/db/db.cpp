@@ -724,6 +724,27 @@ struct timeval start;
 #endif
 #endif
 
+#if defined (MSSD_DSM)
+MSSD_MAP* mssd_map; //mssd map table, need mssd.h
+FILE* my_fp8;
+int my_coll_streamid1;
+int my_coll_streamid2;
+
+int my_index_streamid1;
+int my_index_streamid2;
+off_t *retval; //shared return val for offset
+uint64_t count1;
+uint64_t count2;
+//for mssd thread
+pthread_t mssd_tid;
+pthread_mutex_t mssd_mutex1;
+pthread_cond_t mssd_cond1;
+bool my_is_mssd_running;
+#if defined (MSSD_DSM_DEBUG)
+struct timeval start;
+#endif //MSSD_DSM_DEBUG
+#endif // MSSD_DSM
+
 
 int main(int argc, char* argv[], char** envp) {
     int exitCode = mongoDbMain(argc, argv, envp);
