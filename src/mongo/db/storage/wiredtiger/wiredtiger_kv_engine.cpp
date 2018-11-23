@@ -89,6 +89,30 @@ extern struct timeval start;
 #endif
 #endif //MSSD_BOUNDBASED
 
+#if defined (MSSD_DSM)
+#include <stdint.h> //for PRIu64
+//#include "third_party/mssd/mssd.h"
+#include <third_party/wiredtiger/src/include/mssd.h>
+extern MSSD_MAP* mssd_map;
+extern off_t* retval;
+extern FILE* my_fp8;
+extern int my_coll_streamid1;
+extern int my_coll_streamid2;
+extern int my_index_streamid1;
+extern int my_index_streamid2;
+extern uint64_t count1;
+extern uint64_t count2;
+extern void mssdmap_free(MSSD_MAP* m);
+extern MSSD_MAP* mssdmap_new();
+extern bool my_is_mssd_running;
+extern pthread_mutex_t mssd_mutex1;
+extern pthread_cond_t mssd_cond1;
+#if defined(MSSD_DSM_DEBUG) 
+extern struct timeval start;
+#endif //MSSD_DSM_DEBUG
+
+#endif //MSSD_DSM
+
 #if !defined(__has_feature)
 #define __has_feature(x) 0
 #endif
@@ -220,6 +244,27 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
 	gettimeofday(&start, NULL);
 #endif 
 #endif //MSSD_BOUNDBASED
+
+#if defined (MSSD_DSM)
+	//do initilizations
+	my_fp8 = fopen("my_mssd_track8.txt", "a");
+	
+	mssd_map = mssdmap_new();
+	retval = (off_t*) malloc(sizeof(off_t));
+
+	my_coll_streamid1 = 3;
+	my_coll_streamid2 = 4;
+
+	my_index_streamid1 = 5;
+	my_index_streamid2 = 6;
+
+	count1 = count2 = 0;
+#if defined(MSSD_DSM_DEBUG)
+	//start the time counter
+	gettimeofday(&start, NULL);
+#endif //MSSD_DSM_DEBUG
+
+#endif //MSSD_DSM
 
     if (!_durable) {
         // If we started without the journal, but previously used the journal then open with the
