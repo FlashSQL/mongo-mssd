@@ -343,6 +343,28 @@ void WiredTigerKVEngine::cleanShutdown() {
 	mssdmap_free(mssd_map);	
 #endif //MSSD_BOUNDBASED
 
+#if defined (MSSD_DSM)
+	int ret;
+	mssdmap_flexmap(mssd_map, my_fp8);
+
+
+	//report statistic information
+	mssdmap_stat_report(mssd_map, my_fp8);	
+
+	my_is_mssd_running = false;
+	pthread_cond_destroy(&mssd_cond1);
+	pthread_mutex_destroy(&mssd_mutex1);
+	//free what we've allocated
+	printf("free mssd struct\n");
+	free(retval);
+	mssdmap_free(mssd_map);	
+
+	ret = fflush(my_fp8);
+	if (ret){
+		perror("fflush");
+	}
+#endif //MSSD_DSM
+
         // these must be the last things we do before _conn->close();
         _sizeStorer.reset(NULL);
         if (_journalFlusher)
