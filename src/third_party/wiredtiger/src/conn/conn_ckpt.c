@@ -203,7 +203,11 @@ __ckpt_server_start(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_thread_create(
 	    session, &conn->ckpt_tid, __ckpt_server, session));
 	conn->ckpt_tid_set = true;
-
+#if defined (MSSD_DSM)
+	my_is_mssd_running = true;
+	WT_RET(pthread_create(&mssd_tid, NULL, __mssd_map_thread, NULL));
+	printf("========>>||||| create thread for mssd \n");
+#endif //MSSD_DSM
 	return (0);
 }
 
