@@ -115,6 +115,10 @@ __ckpt_server(void *arg)
 	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
 
+#if defined (MSSD_DSM)
+	int ret_tem;
+#endif
+
 	session = arg;
 	conn = S2C(session);
 	wt_session = (WT_SESSION *)session;
@@ -128,6 +132,16 @@ __ckpt_server(void *arg)
 		 */
 		WT_ERR(
 		    __wt_cond_wait(session, conn->ckpt_cond, conn->ckpt_usecs));
+#if defined (MSSD_DSM)
+		//Before call checkpoint, signal the __mssd_map_thread() to do the stream mapping 
+		ret_tem = pthread_mutex_trylock(&mssd_mutex1);
+		if (ret_tem == 0) {
+			pthread_cond_signal(&mssd_cond1);
+			pthread_mutex_unlock(&mssd_mutex1);
+		}
+		else {
+		}
+#endif //MSSD_DSM
 
 		/* Checkpoint the database. */
 		WT_ERR(wt_session->checkpoint(wt_session, conn->ckpt_config));
