@@ -8,6 +8,15 @@
 
 #include "wt_internal.h"
 
+#if defined (MSSD_DSM)
+#include "mssd.h"
+extern FILE* my_fp8;
+extern MSSD_MAP* mssd_map;
+extern pthread_t mssd_tid;
+extern pthread_mutex_t mssd_mutex1;
+extern pthread_cond_t mssd_cond1;
+extern bool my_is_mssd_running;
+#endif //MSSD_DSM
 static int __ckpt_server_start(WT_CONNECTION_IMPL *);
 
 /*
@@ -76,6 +85,24 @@ err:	__wt_scr_free(session, &tmp);
 	return (ret);
 }
 
+#if defined (MSSD_DSM)
+static WT_THREAD_RET 
+__mssd_map_thread(void* arg) {
+
+	while (my_is_mssd_running) {
+		//wait for pthread_cond_signal
+		pthread_cond_wait(&mssd_cond1, &mssd_mutex1);
+		// wait for other thread weak me up ...
+		
+		//wakeup by another thread
+		mssdmap_flexmap(mssd_map, my_fp8);		
+
+	} //end while
+	printf("=============> inside MSSD handle thread, end WHILE \n");
+	pthread_exit(NULL);
+	return (WT_THREAD_RET_VALUE);
+}	
+#endif //MSSD_DSM
 /*
  * __ckpt_server --
  *	The checkpoint server thread.
